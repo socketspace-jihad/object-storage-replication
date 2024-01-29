@@ -47,3 +47,20 @@ or; compile it first
 go build -o <app_name>
 ./<app_name>
 ```
+
+# How to Contribute
+## Source Object Storage
+1. go to source/ folder
+2. See all the method signatures on Source Interface
+3. Create new folder inside source/ with Object Storage engine/vendor name
+4. Create new struct and implement the Source interface
+5. Create init function and register to the SourceMap as a SourceFactory
+6. new. Source ready to use
+
+## Destination Object Storage
+1. go to destination/ folder
+2. See all the method signatures on Destination Interface
+3. Create new folder inside destination/ with Object Storage engine/vendor name
+4. Create new struct and implement the Destination interface
+5. Create init function and register to the DestinationMap as a DestinationFactory
+6. new Destination ready to use
