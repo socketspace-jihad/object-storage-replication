@@ -71,9 +71,10 @@ func (d *DestinationS3) Write(data chan serializer.SEF) error {
 			case "NotFound":
 				log.Printf("Object: %v not found on destination, Writing Data\n", b.Filename)
 				if _, err := bucket.PutObject(&s3.PutObjectInput{
-					Bucket: awssdk.String(d.BucketName),
-					Key:    awssdk.String(b.Filename),
-					Body:   awssdk.ReadSeekCloser(bytes.NewReader(b.Data)),
+					Bucket:   awssdk.String(d.BucketName),
+					Key:      awssdk.String(b.Filename),
+					Body:     awssdk.ReadSeekCloser(bytes.NewReader(b.Data)),
+					Metadata: b.AWSS3Metadata,
 				}); err != nil {
 					log.Println(err.Error())
 				}

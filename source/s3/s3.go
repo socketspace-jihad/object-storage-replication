@@ -116,8 +116,9 @@ func (s *SourceS3) PullWithDateFilter(date time.Time) []chan serializer.SEF {
 						log.Println("ERROR READ BUFFER: ", err)
 					}
 					c <- serializer.SEF{
-						Data:     res,
-						Filename: *obj.Key,
+						Data:          res,
+						Filename:      *obj.Key,
+						AWSS3Metadata: f.Metadata,
 					}
 					close(c)
 				}(obj)
