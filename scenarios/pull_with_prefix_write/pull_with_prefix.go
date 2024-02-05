@@ -1,7 +1,9 @@
 package pullallwrite
 
 import (
+	"errors"
 	"log"
+	"os"
 	"sync"
 
 	"github.com/socketspace-jihad/s3-sync-replication/destination"
@@ -10,27 +12,30 @@ import (
 	"github.com/socketspace-jihad/s3-sync-replication/source"
 )
 
-type PullAllWrite struct {
+type PullWithPrefix struct {
 	source.Source
 	destination.Destination
 }
 
-func NewPullAllWrite(src source.Source, dest destination.Destination) scenarios.Scenarios {
-	return &PullAllWrite{
+func NewPullPullWithPrefixWrite(src source.Source, dest destination.Destination) scenarios.Scenarios {
+	return &PullWithPrefix{
 		Source:      src,
 		Destination: dest,
 	}
 }
 
-func (p *PullAllWrite) Validate() error {
+func (p *PullWithPrefix) Validate() error {
+	if _, ok := os.LookupEnv("PREFIX"); !ok {
+		return errors.New("environment not found: START_DATE")
+	}
 	return nil
 }
 
-func (p *PullAllWrite) Run() error {
+func (p *PullWithPrefix) Run() error {
 	commChan := make(chan serializer.SEF)
 	wg := &sync.WaitGroup{}
 	log.Println("PULLING SOURCE..")
-	p.Source.PullAll(commChan, wg)
+	p.Source.PullWithPrefix(commChan, wg, os.Getenv("PREFIX"))
 	go p.Destination.Write(commChan, wg)
 	log.Println("WAITING THE REPLICATION TO BE COMPLETED..")
 	wg.Wait()
@@ -39,5 +44,5 @@ func (p *PullAllWrite) Run() error {
 }
 
 func init() {
-	scenarios.RegisterScenarios("pull_all_write", NewPullAllWrite)
+	scenarios.RegisterScenarios("pull_with_prefix_write", NewPullPullWithPrefixWrite)
 }

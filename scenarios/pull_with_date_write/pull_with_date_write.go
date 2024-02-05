@@ -59,16 +59,12 @@ func getNewTime(t time.Time, s string) time.Time {
 
 func (p *PullWithDateWrite) Run() error {
 	t := getNewTime(time.Now(), os.Getenv("START_DATE"))
-	files := p.Source.PullWithDateFilter(t)
+	commChan := make(chan serializer.SEF)
 	wg := &sync.WaitGroup{}
-	for _, file := range files {
-		wg.Add(1)
-		go func(file chan serializer.SEF) {
-			defer wg.Done()
-			p.Destination.Write(file)
-		}(file)
-	}
+	p.Source.PullWithDateFilter(commChan, wg, t)
+	go p.Destination.Write(commChan, wg)
 	wg.Wait()
+	close(commChan)
 	return nil
 }
 

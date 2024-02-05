@@ -2,12 +2,18 @@ package s3
 
 import (
 	"bytes"
+	"context"
 	"errors"
+	"io"
 	"log"
+	"net/http"
 	"os"
+	"sync"
+	"time"
 
 	awssdk "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -58,30 +64,91 @@ func (d *DestinationS3) Validate() error {
 	return nil
 }
 
-func (d *DestinationS3) Write(data chan serializer.SEF) error {
-	bucket := s3.New(d.Session)
-	b := <-data
-	_, err := bucket.HeadObject(&s3.HeadObjectInput{
-		Bucket: awssdk.String(d.BucketName),
-		Key:    awssdk.String(b.Filename),
-	})
+func upload(ctx context.Context, bucket *s3.S3, doneChan chan error, b serializer.SEF, d *DestinationS3) {
+	f, err := io.ReadAll(b.Body)
 	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok {
-			switch awsErr.Code() {
-			case "NotFound":
-				log.Printf("Object: %v not found on destination, Writing Data\n", b.Filename)
-				if _, err := bucket.PutObject(&s3.PutObjectInput{
-					Bucket:   awssdk.String(d.BucketName),
-					Key:      awssdk.String(b.Filename),
-					Body:     awssdk.ReadSeekCloser(bytes.NewReader(b.Data)),
-					Metadata: b.AWSS3Metadata,
-				}); err != nil {
-					log.Println(err.Error())
+		doneChan <- err
+		return
+	}
+	length := len(f)
+	if _, err := bucket.PutObjectWithContext(ctx, &s3.PutObjectInput{
+		Bucket:               awssdk.String(d.BucketName),
+		Key:                  awssdk.String(b.Filename),
+		Body:                 awssdk.ReadSeekCloser(bytes.NewReader(f)),
+		Metadata:             b.AWSS3Object.Metadata,
+		ContentType:          b.AWSS3Object.ContentType,
+		ContentDisposition:   b.AWSS3Object.ContentDisposition,
+		ContentLanguage:      b.AWSS3Object.ContentLanguage,
+		ContentEncoding:      b.AWSS3Object.ContentEncoding,
+		ChecksumSHA256:       b.AWSS3Object.ChecksumSHA256,
+		ChecksumAlgorithm:    b.AWSS3Object.ChecksumAlgorithm,
+		ContentLength:        awssdk.Int64(int64(length)),
+		ServerSideEncryption: b.AWSS3Object.ServerSideEncryption,
+	}); err != nil {
+		doneChan <- err
+	}
+	doneChan <- nil
+}
+
+func (d *DestinationS3) Write(data <-chan serializer.SEF, wg *sync.WaitGroup) error {
+	log.Println("PREPARING WRITE DESTINATION..")
+	bucket := s3.New(d.Session, &awssdk.Config{
+		Retryer: client.DefaultRetryer{
+			NumMaxRetries:    3,
+			MinRetryDelay:    2 * time.Second,
+			MaxRetryDelay:    5 * time.Second,
+			MinThrottleDelay: 2 * time.Second,
+			MaxThrottleDelay: 10 * time.Second,
+		},
+		HTTPClient: &http.Client{
+			Timeout: 24 * time.Hour,
+			Transport: &http.Transport{
+				IdleConnTimeout: 300 * time.Second,
+				MaxIdleConns:    5000,
+			},
+		},
+	})
+	for b := range data {
+		go func(b serializer.SEF) {
+			defer wg.Done()
+			defer b.Body.Close()
+			headCheckBucket := s3.New(d.Session, &awssdk.Config{
+				Retryer: client.DefaultRetryer{
+					NumMaxRetries:    3,
+					MinRetryDelay:    2 * time.Second,
+					MaxRetryDelay:    5 * time.Second,
+					MinThrottleDelay: 2 * time.Second,
+					MaxThrottleDelay: 10 * time.Second,
+				},
+				HTTPClient: http.DefaultClient,
+			})
+			_, err := headCheckBucket.HeadObject(&s3.HeadObjectInput{
+				Bucket: awssdk.String(d.BucketName),
+				Key:    awssdk.String(b.Filename),
+			})
+			if err != nil {
+				if awsErr, ok := err.(awserr.Error); ok {
+					switch awsErr.Code() {
+					case "NotFound":
+						log.Printf("Object: %v not found on destination, Writing Data\n", b.Filename)
+						ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
+						defer cancel()
+						doneChan := make(chan error)
+						go upload(ctx, bucket, doneChan, b, d)
+						select {
+						case <-ctx.Done():
+							log.Println("UPLOAD TIMEOUT!")
+						case err := <-doneChan:
+							if err != nil {
+								log.Println("UPLOAD ERROR", err)
+							}
+						}
+					default:
+						log.Println("NOT UPLOADING.", awsErr)
+					}
 				}
-			default:
-				log.Println("NOT UPLOADING.", awsErr.Code())
 			}
-		}
+		}(b)
 	}
 	return nil
 }
