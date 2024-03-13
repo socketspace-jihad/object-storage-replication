@@ -10,6 +10,7 @@ import (
 	"github.com/socketspace-jihad/s3-sync-replication/scenarios"
 	_ "github.com/socketspace-jihad/s3-sync-replication/scenarios/pull_all_write"
 	_ "github.com/socketspace-jihad/s3-sync-replication/scenarios/pull_with_date_write"
+	_ "github.com/socketspace-jihad/s3-sync-replication/scenarios/pull_with_hourly_prefix_write"
 	_ "github.com/socketspace-jihad/s3-sync-replication/scenarios/pull_with_prefix_write"
 	"github.com/socketspace-jihad/s3-sync-replication/source"
 	_ "github.com/socketspace-jihad/s3-sync-replication/source/s3"

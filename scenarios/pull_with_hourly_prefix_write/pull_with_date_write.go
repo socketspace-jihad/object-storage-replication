@@ -2,6 +2,7 @@ package pullwithdatewrite
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -14,26 +15,29 @@ import (
 	"github.com/socketspace-jihad/s3-sync-replication/source"
 )
 
-type PullWithDateWrite struct {
+type PullWithHourlyPrefixWrite struct {
 	source.Source
 	destination.Destination
 }
 
-func (p *PullWithDateWrite) Validate() error {
+func (p *PullWithHourlyPrefixWrite) Validate() error {
 	if _, ok := os.LookupEnv("START_DATE"); !ok {
 		return errors.New("environment not found: START_DATE")
+	}
+	if _, ok := os.LookupEnv("PREFIX"); !ok {
+		return errors.New("environment not found: PREFIX")
 	}
 	return nil
 }
 
-func NewPullWithDateWrite(src source.Source, dest destination.Destination) scenarios.Scenarios {
-	return &PullWithDateWrite{
+func NewPullWithHourlyPrefixWrite(src source.Source, dest destination.Destination) scenarios.Scenarios {
+	return &PullWithHourlyPrefixWrite{
 		Source:      src,
 		Destination: dest,
 	}
 }
 
-func getNewTime(t time.Time, s string) time.Time {
+func getPrefixTime(t time.Time, s string, prefix string) string {
 	length := len(s)
 	metric := s[length-1]
 	num, err := strconv.Atoi(s[1 : length-1])
@@ -54,20 +58,20 @@ func getNewTime(t time.Time, s string) time.Time {
 		log.Printf("GETTING DATA FROM %v SECOND AGO..\n", num)
 		t = t.Add(time.Duration(-num) * time.Second)
 	}
-	return t
+	return fmt.Sprintf("%v%v-%v-%v-%v", prefix, t.Year(), int(t.Month())+1, t.Day(), t.Hour())
 }
 
-func (p *PullWithDateWrite) Run() error {
-	t := getNewTime(time.Now(), os.Getenv("START_DATE"))
+func (p *PullWithHourlyPrefixWrite) Run() error {
+	t := getPrefixTime(time.Now(), os.Getenv("START_DATE"), os.Getenv("PREFIX"))
 	commChan := make(chan serializer.SEF)
 	wg := &sync.WaitGroup{}
 	go p.Destination.Write(commChan, wg)
-	p.Source.PullWithDateFilter(commChan, wg, t)
+	p.Source.PullWithPrefix(commChan, wg, t)
 	wg.Wait()
 	close(commChan)
 	return nil
 }
 
 func init() {
-	scenarios.RegisterScenarios("pull_with_date_write", NewPullWithDateWrite)
+	scenarios.RegisterScenarios("pull_with_hourly_prefix_write", NewPullWithHourlyPrefixWrite)
 }

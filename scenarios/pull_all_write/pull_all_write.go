@@ -30,8 +30,8 @@ func (p *PullAllWrite) Run() error {
 	commChan := make(chan serializer.SEF, 2048)
 	wg := &sync.WaitGroup{}
 	log.Println("PULLING SOURCE..")
-	p.Source.PullAll(commChan, wg)
 	go p.Destination.Write(commChan, wg)
+	p.Source.PullAll(commChan, wg)
 	log.Println("WAITING THE REPLICATION TO BE COMPLETED..")
 	wg.Wait()
 	close(commChan)

@@ -93,42 +93,40 @@ func (s *SourceS3) PullAll(comm chan serializer.SEF, wg *sync.WaitGroup) []chan 
 		},
 	})
 	result := []chan serializer.SEF{}
-	err := bucket.ListObjectsPages(&s3.ListObjectsInput{
+	err := bucket.ListObjectsV2Pages(&s3.ListObjectsV2Input{
 		Bucket: awssdk.String(s.BucketName),
-	}, func(data *s3.ListObjectsOutput, b bool) bool {
-		wg.Add(len(data.Contents))
-		go func() {
-			for _, obj := range data.Contents {
-				go func(obj *s3.Object) {
-					f, err := objectBucket.GetObject(&s3.GetObjectInput{
-						Bucket: awssdk.String(s.BucketName),
-						Key:    awssdk.String(*obj.Key),
-					})
-					if err != nil {
-						log.Println("ERROR GET OBJECT :", err)
-						f.Body.Close()
-						wg.Done()
-						return
-					}
-					comm <- serializer.SEF{
-						Filename: *obj.Key,
-						AWSS3Object: &serializer.AWSS3Object{
-							Body:                 f.Body,
-							Metadata:             f.Metadata,
-							ContentLength:        f.ContentLength,
-							ContentType:          f.ContentType,
-							ChecksumSHA256:       f.ChecksumSHA256,
-							ContentDisposition:   f.ContentDisposition,
-							ContentLanguage:      f.ContentLanguage,
-							ContentEncoding:      f.ContentEncoding,
-							ChecksumAlgorithm:    f.ChecksumSHA256,
-							ServerSideEncryption: f.ServerSideEncryption,
-						},
-					}
-				}(obj)
-			}
-			log.Println("GRAB:", len(data.Contents))
-		}()
+	}, func(data *s3.ListObjectsV2Output, b bool) bool {
+		for _, obj := range data.Contents {
+			wg.Add(1)
+			go func(obj *s3.Object) {
+				f, err := objectBucket.GetObject(&s3.GetObjectInput{
+					Bucket: awssdk.String(s.BucketName),
+					Key:    awssdk.String(*obj.Key),
+				})
+				if err != nil {
+					log.Println("ERROR GET OBJECT :", err)
+					f.Body.Close()
+					wg.Done()
+					return
+				}
+				comm <- serializer.SEF{
+					Filename: *obj.Key,
+					AWSS3Object: &serializer.AWSS3Object{
+						Body:                 f.Body,
+						Metadata:             f.Metadata,
+						ContentLength:        f.ContentLength,
+						ContentType:          f.ContentType,
+						ChecksumSHA256:       f.ChecksumSHA256,
+						ContentDisposition:   f.ContentDisposition,
+						ContentLanguage:      f.ContentLanguage,
+						ContentEncoding:      f.ContentEncoding,
+						ChecksumAlgorithm:    f.ChecksumSHA256,
+						ServerSideEncryption: f.ServerSideEncryption,
+					},
+				}
+			}(obj)
+		}
+		log.Println("GRAB:", len(data.Contents))
 		return true
 	})
 	if err != nil {
@@ -173,10 +171,10 @@ func (s *SourceS3) PullWithPrefix(comm chan serializer.SEF, wg *sync.WaitGroup, 
 		},
 	})
 	result := []chan serializer.SEF{}
-	err := bucket.ListObjectsPages(&s3.ListObjectsInput{
+	err := bucket.ListObjectsV2Pages(&s3.ListObjectsV2Input{
 		Bucket: awssdk.String(s.BucketName),
 		Prefix: awssdk.String(prefix),
-	}, func(data *s3.ListObjectsOutput, b bool) bool {
+	}, func(data *s3.ListObjectsV2Output, b bool) bool {
 		wg.Add(len(data.Contents))
 		go func() {
 			for _, obj := range data.Contents {
@@ -254,9 +252,9 @@ func (s *SourceS3) PullWithDateFilter(comm chan serializer.SEF, wg *sync.WaitGro
 		},
 	})
 	result := []chan serializer.SEF{}
-	err := bucket.ListObjectsPages(&s3.ListObjectsInput{
+	err := bucket.ListObjectsV2Pages(&s3.ListObjectsV2Input{
 		Bucket: awssdk.String(s.BucketName),
-	}, func(data *s3.ListObjectsOutput, b bool) bool {
+	}, func(data *s3.ListObjectsV2Output, b bool) bool {
 		wg.Add(len(data.Contents))
 		go func() {
 			for _, obj := range data.Contents {

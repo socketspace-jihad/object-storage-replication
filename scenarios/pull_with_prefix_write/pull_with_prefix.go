@@ -26,7 +26,7 @@ func NewPullPullWithPrefixWrite(src source.Source, dest destination.Destination)
 
 func (p *PullWithPrefix) Validate() error {
 	if _, ok := os.LookupEnv("PREFIX"); !ok {
-		return errors.New("environment not found: START_DATE")
+		return errors.New("environment not found: PREFIX")
 	}
 	return nil
 }
@@ -35,8 +35,8 @@ func (p *PullWithPrefix) Run() error {
 	commChan := make(chan serializer.SEF)
 	wg := &sync.WaitGroup{}
 	log.Println("PULLING SOURCE..")
-	p.Source.PullWithPrefix(commChan, wg, os.Getenv("PREFIX"))
 	go p.Destination.Write(commChan, wg)
+	p.Source.PullWithPrefix(commChan, wg, os.Getenv("PREFIX"))
 	log.Println("WAITING THE REPLICATION TO BE COMPLETED..")
 	wg.Wait()
 	close(commChan)
