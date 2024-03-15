@@ -171,11 +171,13 @@ func (s *SourceS3) PullWithPrefix(comm chan serializer.SEF, wg *sync.WaitGroup, 
 		},
 	})
 	result := []chan serializer.SEF{}
+	log.Println("PREFIX:", prefix)
 	err := bucket.ListObjectsV2Pages(&s3.ListObjectsV2Input{
 		Bucket: awssdk.String(s.BucketName),
 		Prefix: awssdk.String(prefix),
 	}, func(data *s3.ListObjectsV2Output, b bool) bool {
 		wg.Add(len(data.Contents))
+		log.Println("CONTENTS:", data.Contents)
 		go func() {
 			for _, obj := range data.Contents {
 				go func(obj *s3.Object) {

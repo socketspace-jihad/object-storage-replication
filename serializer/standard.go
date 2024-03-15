@@ -2,6 +2,8 @@ package serializer
 
 import (
 	"io"
+
+	"github.com/aws/aws-sdk-go/service/s3"
 )
 
 type AWSS3Object struct {
@@ -16,6 +18,7 @@ type AWSS3Object struct {
 	ContentMD5           *string
 	ChecksumAlgorithm    *string
 	ServerSideEncryption *string
+	ACL                  *s3.GetBucketAclOutput
 }
 
 // Standard Exchange Format

@@ -20,6 +20,7 @@ import (
 	"github.com/socketspace-jihad/s3-sync-replication/backend/aws"
 	"github.com/socketspace-jihad/s3-sync-replication/destination"
 	"github.com/socketspace-jihad/s3-sync-replication/serializer"
+	"github.com/socketspace-jihad/s3-sync-replication/utils"
 )
 
 type DestinationS3 aws.AWSS3
@@ -84,6 +85,7 @@ func upload(ctx context.Context, bucket *s3.S3, doneChan chan error, b serialize
 		ChecksumAlgorithm:    b.AWSS3Object.ChecksumAlgorithm,
 		ContentLength:        awssdk.Int64(int64(length)),
 		ServerSideEncryption: b.AWSS3Object.ServerSideEncryption,
+		ACL:                  awssdk.String(utils.GetScopeReplication()),
 	}); err != nil {
 		doneChan <- err
 	}

@@ -27,6 +27,9 @@ func (p *PullWithHourlyPrefixWrite) Validate() error {
 	if _, ok := os.LookupEnv("PREFIX"); !ok {
 		return errors.New("environment not found: PREFIX")
 	}
+	if _, ok := os.LookupEnv("TARGET_SCOPE"); !ok {
+		return errors.New("environment not found: TARGET_SCOPE")
+	}
 	return nil
 }
 
@@ -58,11 +61,11 @@ func getPrefixTime(t time.Time, s string, prefix string) string {
 		log.Printf("GETTING DATA FROM %v SECOND AGO..\n", num)
 		t = t.Add(time.Duration(-num) * time.Second)
 	}
-	return fmt.Sprintf("%v%v-%v-%v-%v", prefix, t.Year(), int(t.Month())+1, t.Day(), t.Hour())
+	return fmt.Sprintf("%v%v-%v-%v-%v", prefix, t.Year(), fmt.Sprintf("%02d", int(t.Month())), fmt.Sprintf("%02d", t.Day()), fmt.Sprintf("%02d", t.Hour()))
 }
 
 func (p *PullWithHourlyPrefixWrite) Run() error {
-	t := getPrefixTime(time.Now(), os.Getenv("START_DATE"), os.Getenv("PREFIX"))
+	t := getPrefixTime(time.Now().UTC(), os.Getenv("START_DATE"), os.Getenv("PREFIX"))
 	commChan := make(chan serializer.SEF)
 	wg := &sync.WaitGroup{}
 	go p.Destination.Write(commChan, wg)
